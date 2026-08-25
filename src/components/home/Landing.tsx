@@ -6,10 +6,21 @@ import Link from 'next/link'
 
 export function Landing() {
   const { t } = useLocale()
-  const feats = [t.featThemeIn, t.featParallel, t.featEdit, t.featHistory, t.featSchedule, t.featI18n, t.featModes]
+  const feats = [
+    t.featThemeIn,
+    t.featParallel,
+    t.featEdit,
+    t.featRegen,
+    t.featHistory,
+    t.featQueue,
+    t.featSchedule,
+    t.featI18n,
+    t.featModes,
+  ]
+  const plates = [t.twitter, t.linkedin, t.instagram, t.blog]
 
   return (
-    <div className="grid gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
+    <div className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
       <div>
         <h1 className="display amber text-6xl leading-none tracking-[-0.03em] sm:text-7xl">{t.brand}</h1>
         <p className="mt-4 text-2xl">{t.product}</p>
@@ -21,19 +32,36 @@ export function Landing() {
       </div>
       <div className="relative">
         <div className="wax-seal" aria-hidden />
-        <motion.ul
+        <motion.div
           initial={{ opacity: 0, x: 24 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.8, ease: [0.32, 0.72, 0, 1] }}
-          className="sheet relative space-y-3 p-8"
+          className="sheet relative p-6"
         >
-          {feats.map((feat) => (
-            <li key={feat} className="flex items-center gap-3 border-b py-3 last:border-0" style={{ borderColor: 'var(--line)' }}>
-              <span className="h-2 w-2 rounded-full" style={{ background: 'var(--ember)' }} />
-              {feat}
-            </li>
-          ))}
-        </motion.ul>
+          <div className="grid grid-cols-2 gap-3">
+            {plates.map((plate, index) => (
+              <motion.div
+                key={plate}
+                className="plate rounded-xl border p-3"
+                style={{ borderColor: 'var(--line)' }}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15 + index * 0.08 }}
+              >
+                <p className="stamp">{plate}</p>
+                <span className="ink-bar mt-3 block" />
+              </motion.div>
+            ))}
+          </div>
+          <ul className="mt-5 space-y-2">
+            {feats.map((feat) => (
+              <li key={feat} className="flex items-center gap-3 text-sm">
+                <span className="h-2 w-2 rounded-full" style={{ background: 'var(--ember)' }} />
+                {feat}
+              </li>
+            ))}
+          </ul>
+        </motion.div>
       </div>
     </div>
   )

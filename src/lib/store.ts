@@ -55,3 +55,17 @@ export async function saveQueueItem(item: QueueItem) {
   await writeJson(queueFile, items)
   return item
 }
+
+export async function deletePack(id: string) {
+  const packs = await listPacks()
+  const next = packs.filter((item) => item.id !== id)
+  await writeJson(historyFile, next)
+  return next
+}
+
+export async function deleteQueueItem(id: string) {
+  const items = await listQueue()
+  const next = items.filter((item) => item.id !== id)
+  await writeJson(queueFile, next)
+  return next
+}

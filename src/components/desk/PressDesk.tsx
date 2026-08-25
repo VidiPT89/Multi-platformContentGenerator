@@ -1,11 +1,14 @@
 'use client'
 
+import { PlateCard } from '@/components/desk/PlateCard'
+import { SideRail } from '@/components/desk/SideRail'
 import { useLocale } from '@/i18n/LocaleProvider'
-import { LIMITS, PLATFORMS, type Pack, type Platform, type Tone } from '@/lib/types'
-import { motion } from 'framer-motion'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { PLATFORMS, type Pack, type Platform, type QueueItem, type Tone } from '@/lib/types'
+import { parseWhen } from '@/lib/when'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 const empty = (): Record<Platform, string> => ({ twitter: '', linkedin: '', instagram: '', blog: '' })
+const TONE_KEY = 'eco-tone'
 
 function defaultWhen() {
   const next = new Date(Date.now() + 60 * 60 * 1000)
@@ -24,24 +27,36 @@ export function PressDesk() {
   const [buffer, setBuffer] = useState(false)
   const [packId, setPackId] = useState('')
   const [packs, setPacks] = useState<Pack[]>([])
+  const [queue, setQueue] = useState<QueueItem[]>([])
   const [when, setWhen] = useState(defaultWhen)
   const [note, setNote] = useState('')
-  const [copied, setCopied] = useState<Platform | null>(null)
+  const [copied, setCopied] = useState<Platform | 'all' | null>(null)
+  const [dirty, setDirty] = useState(false)
+  const textsRef = useRef(texts)
+  textsRef.current = texts
 
   const labels = useMemo(
     () => ({ twitter: t.twitter, linkedin: t.linkedin, instagram: t.instagram, blog: t.blog }),
     [t],
   )
+  const sample = locale === 'en'
+    ? 'Launching iVidi.dev: sites and apps for people and small businesses, from Cascais.'
+    : 'Abrir a iVidi.dev: sites e apps para particulares e pequenas empresas, a partir de Cascais.'
 
   const loadHistory = useCallback(async () => {
-    const [hist, sched] = await Promise.all([fetch('/api/history'), fetch('/api/schedule')])
+    const [hist, sched, gen] = await Promise.all([fetch('/api/history'), fetch('/api/schedule'), fetch('/api/generate')])
     if (hist.ok) {
       const data = (await hist.json()) as { packs: Pack[] }
       setPacks(data.packs)
     }
     if (sched.ok) {
-      const data = (await sched.json()) as { buffer: boolean }
+      const data = (await sched.json()) as { items: QueueItem[]; buffer: boolean }
+      setQueue(data.items)
       setBuffer(data.buffer)
+    }
+    if (gen.ok) {
+      const data = (await gen.json()) as { live: boolean }
+      setLive(Boolean(data.live))
     }
   }, [])
 
@@ -49,41 +64,102 @@ export function PressDesk() {
     void loadHistory()
   }, [loadHistory])
 
-  async function generate() {
+  useEffect(() => {
+    const stored = localStorage.getItem(TONE_KEY)
+    if (stored === 'formal' || stored === 'warm' || stored === 'punchy' || stored === 'playful') setTone(stored)
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem(TONE_KEY, tone)
+  }, [tone])
+
+  useEffect(() => {
+    if (!dirty || busy || topic.trim().length < 3) return
+    const id = window.setTimeout(() => {
+      void persist()
+        .then(() => {
+          setDirty(false)
+          setNote(t.saved)
+        })
+        .catch(() => setNote(t.error))
+    }, 900)
+    return () => window.clearTimeout(id)
+  }, [dirty, texts, busy, topic, t.saved, t.error])
+
+  async function readStream(res: Response, platforms: Platform[]) {
+    if (!res.ok || !res.body) throw new Error('generate')
+    const acc = { ...textsRef.current }
+    for (const platform of platforms) acc[platform] = ''
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buf = ''
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buf += decoder.decode(value, { stream: true })
+      const chunks = buf.split('\n\n')
+      buf = chunks.pop() ?? ''
+      for (const chunk of chunks) {
+        const line = chunk.replace(/^data:\s*/, '')
+        if (!line) continue
+        const event = JSON.parse(line) as { type: string; live?: boolean; platform?: Platform; text?: string }
+        if (event.type === 'meta') setLive(Boolean(event.live))
+        if (event.type === 'delta' && event.platform && platforms.includes(event.platform) && event.text) {
+          acc[event.platform] += event.text
+          textsRef.current = { ...acc }
+          setTexts({ ...acc })
+        }
+      }
+    }
+    return acc
+  }
+
+  async function persist(nextTexts = textsRef.current, id = packId) {
+    const res = await fetch('/api/history', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: id || crypto.randomUUID(),
+        topic: topic.trim(),
+        tone,
+        locale,
+        texts: nextTexts,
+      }),
+    })
+    if (!res.ok) throw new Error('save')
+    const data = (await res.json()) as { pack: Pack }
+    setPackId(data.pack.id)
+    await loadHistory()
+    return data.pack.id
+  }
+
+  async function generate(platforms: Platform[] = PLATFORMS) {
     if (topic.trim().length < 3) {
       setNote(t.needTopic)
       return
     }
     setBusy(true)
     setNote('')
-    setTexts(empty)
-    setPackId(crypto.randomUUID())
+    const id = packId || crypto.randomUUID()
+    setPackId(id)
+    if (platforms.length === PLATFORMS.length) setTexts(empty)
+    else {
+      setTexts((prev) => {
+        const next = { ...prev }
+        for (const platform of platforms) next[platform] = ''
+        return next
+      })
+    }
     try {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic: topic.trim(), tone, locale }),
+        body: JSON.stringify({ topic: topic.trim(), tone, locale, platforms }),
       })
-      if (!res.ok || !res.body) throw new Error('generate')
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      let buf = ''
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buf += decoder.decode(value, { stream: true })
-        const chunks = buf.split('\n\n')
-        buf = chunks.pop() ?? ''
-        for (const chunk of chunks) {
-          const line = chunk.replace(/^data:\s*/, '')
-          if (!line) continue
-          const event = JSON.parse(line) as { type: string; live?: boolean; platform?: Platform; text?: string }
-          if (event.type === 'meta') setLive(Boolean(event.live))
-          if (event.type === 'delta' && event.platform && event.text) {
-            setTexts((prev) => ({ ...prev, [event.platform!]: prev[event.platform!] + event.text }))
-          }
-        }
-      }
+      const printed = await readStream(res, platforms)
+      await persist(printed, id)
+      setDirty(false)
+      setNote(t.saved)
     } catch {
       setNote(t.error)
     } finally {
@@ -91,37 +167,34 @@ export function PressDesk() {
     }
   }
 
-  async function save() {
-    const res = await fetch('/api/history', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: packId || crypto.randomUUID(),
-        topic: topic.trim(),
-        tone,
-        locale,
-        texts,
-      }),
-    })
-    if (!res.ok) {
-      setNote(t.error)
-      return
+  async function copy(platform: Platform) {
+    try {
+      await navigator.clipboard.writeText(texts[platform])
+      setCopied(platform)
+      window.setTimeout(() => setCopied(null), 1400)
+    } catch {
+      setNote(t.copyFail)
     }
-    const data = (await res.json()) as { pack: Pack }
-    setPackId(data.pack.id)
-    setNote(t.saved)
-    await loadHistory()
   }
 
-  async function copy(platform: Platform) {
-    await navigator.clipboard.writeText(texts[platform])
-    setCopied(platform)
-    window.setTimeout(() => setCopied(null), 1400)
+  async function copyAll() {
+    try {
+      const blob = PLATFORMS.map((platform) => `## ${labels[platform]}\n\n${texts[platform]}`).join('\n\n')
+      await navigator.clipboard.writeText(blob)
+      setCopied('all')
+      window.setTimeout(() => setCopied(null), 1400)
+    } catch {
+      setNote(t.copyFail)
+    }
   }
 
   async function schedule(platform: Platform) {
     if (!texts[platform].trim()) return
-    const iso = new Date(when).toISOString()
+    const iso = parseWhen(when)
+    if (!iso) {
+      setNote(t.needWhen)
+      return
+    }
     const res = await fetch('/api/schedule', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -132,6 +205,41 @@ export function PressDesk() {
       return
     }
     setNote(t.scheduled)
+    await loadHistory()
+  }
+
+  async function scheduleAll() {
+    for (const platform of PLATFORMS) {
+      if (texts[platform].trim()) await schedule(platform)
+    }
+  }
+
+  async function dropPack(id: string) {
+    const res = await fetch('/api/history', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    })
+    if (res.ok) {
+      const data = (await res.json()) as { packs: Pack[] }
+      setPacks(data.packs)
+      if (packId === id) {
+        setPackId('')
+        setTexts(empty)
+      }
+    }
+  }
+
+  async function dropQueue(id: string) {
+    const res = await fetch('/api/schedule', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    })
+    if (res.ok) {
+      const data = (await res.json()) as { items: QueueItem[] }
+      setQueue(data.items)
+    }
   }
 
   function openPack(pack: Pack) {
@@ -140,14 +248,16 @@ export function PressDesk() {
     setTone(pack.tone)
     setTexts(pack.texts)
     setNote('')
+    setDirty(false)
   }
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
+    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
       <div>
         <p className="stamp">{busy ? t.generating : live ? t.liveModel : t.localTools}</p>
         <h1 className="display amber mt-3 text-5xl tracking-[-0.03em]">{t.desk}</h1>
         <p className="muted mt-3 max-w-[46rem]">{t.localHint}</p>
+        <p className="faint mt-2 text-sm">{t.hintKeys}</p>
 
         <label className="tone mt-8 block">
           <span>{t.topic}</span>
@@ -156,6 +266,12 @@ export function PressDesk() {
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
             placeholder={t.topicHint}
+            onKeyDown={(e) => {
+              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                e.preventDefault()
+                void generate()
+              }
+            }}
           />
         </label>
 
@@ -172,46 +288,36 @@ export function PressDesk() {
           <button type="button" className="btn" disabled={busy} onClick={() => void generate()}>
             {busy ? t.generating : t.generate}
           </button>
-          <button type="button" className="btn-ghost" disabled={!topic.trim()} onClick={() => void save()}>
+          <button type="button" className="btn-ghost" onClick={() => setTopic(sample)}>
+            {t.sample}
+          </button>
+          <button type="button" className="btn-ghost" disabled={!topic.trim()} onClick={() => void persist().then(() => setNote(t.saved)).catch(() => setNote(t.error))}>
             {t.save}
+          </button>
+          <button type="button" className="btn-ghost" disabled={!texts.twitter && !texts.linkedin} onClick={() => void copyAll()}>
+            {copied === 'all' ? t.copied : t.copyAll}
           </button>
         </div>
         {note ? <p className="amber mt-3 text-sm">{note}</p> : null}
 
         <div className="mt-8 grid gap-5 md:grid-cols-2">
           {PLATFORMS.map((platform, index) => (
-            <motion.article
+            <PlateCard
               key={platform}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.06, duration: 0.5, ease: [0.32, 0.72, 0, 1] }}
-              className="sheet plate p-5"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <p className="stamp">{labels[platform]}</p>
-                <p className="faint text-xs">
-                  {texts[platform].length}/{LIMITS[platform]} {t.chars}
-                </p>
-              </div>
-              <motion.div
-                className="ink-bar mt-3"
-                initial={{ scaleX: 0 }}
-                animate={{ scaleX: busy && !texts[platform] ? 0.2 : texts[platform] ? 1 : 0 }}
-              />
-              <textarea
-                className="field mt-4 min-h-[12rem] resize-y"
-                value={texts[platform]}
-                onChange={(e) => setTexts((prev) => ({ ...prev, [platform]: e.target.value }))}
-              />
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button type="button" className="btn-ghost" onClick={() => void copy(platform)}>
-                  {copied === platform ? t.copied : t.copy}
-                </button>
-                <button type="button" className="btn-ghost" onClick={() => void schedule(platform)}>
-                  {t.schedule}
-                </button>
-              </div>
-            </motion.article>
+              platform={platform}
+              label={labels[platform]}
+              text={texts[platform]}
+              index={index}
+              busy={busy}
+              copied={copied === platform}
+              onChange={(value) => {
+                setTexts((prev) => ({ ...prev, [platform]: value }))
+                setDirty(true)
+              }}
+              onCopy={() => void copy(platform)}
+              onSchedule={() => void schedule(platform)}
+              onRegen={() => void generate([platform])}
+            />
           ))}
         </div>
 
@@ -220,24 +326,21 @@ export function PressDesk() {
             <span>{t.when}</span>
             <input className="field" type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} />
           </label>
+          <button type="button" className="btn-ghost" onClick={() => void scheduleAll()}>
+            {t.scheduleAll}
+          </button>
           <p className="stamp">{buffer ? t.bufferOn : t.bufferOff}</p>
         </div>
       </div>
 
-      <aside className="sheet h-fit p-5">
-        <p className="stamp">{t.history}</p>
-        <ul className="mt-4 space-y-2">
-          {packs.length === 0 ? <li className="muted text-sm">{t.emptyHistory}</li> : null}
-          {packs.map((pack) => (
-            <li key={pack.id}>
-              <button type="button" className="row w-full rounded-xl px-3 py-2 text-left" onClick={() => openPack(pack)}>
-                <span className="block truncate">{pack.topic}</span>
-                <span className="faint text-xs">{pack.tone}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </aside>
+      <SideRail
+        packs={packs}
+        queue={queue}
+        packId={packId}
+        onOpen={openPack}
+        onDeletePack={(id) => void dropPack(id)}
+        onDeleteQueue={(id) => void dropQueue(id)}
+      />
     </div>
   )
 }

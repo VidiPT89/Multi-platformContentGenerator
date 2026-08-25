@@ -1,5 +1,6 @@
-import { NextRequest } from 'next/server'
-import { PLATFORMS, type Locale, type Platform, type Tone } from '@/lib/types'
+import { NextRequest, NextResponse } from 'next/server'
+import { pickPlatforms } from '@/lib/press'
+import { type Locale, type Platform, type Tone } from '@/lib/types'
 import { hasLiveModel, streamPlatform } from '@/lib/models'
 
 const TONES: Tone[] = ['formal', 'warm', 'punchy', 'playful']
@@ -10,8 +11,12 @@ function sse(data: unknown) {
 
 export const maxDuration = 60
 
+export async function GET() {
+  return NextResponse.json({ live: hasLiveModel() })
+}
+
 export async function POST(request: NextRequest) {
-  const body = (await request.json()) as { topic?: string; tone?: string; locale?: string }
+  const body = (await request.json()) as { topic?: string; tone?: string; locale?: string; platforms?: unknown }
   const topic = body.topic?.trim() ?? ''
   if (topic.length < 3) {
     return new Response(JSON.stringify({ error: 'topic' }), { status: 400 })
@@ -24,8 +29,9 @@ export async function POST(request: NextRequest) {
     async start(controller) {
       const send = (data: unknown) => controller.enqueue(encoder.encode(sse(data)))
       send({ type: 'meta', live: hasLiveModel() })
+      const platforms = pickPlatforms(body.platforms)
       await Promise.all(
-        PLATFORMS.map(async (platform: Platform) => {
+        platforms.map(async (platform: Platform) => {
           try {
             await streamPlatform(platform, topic, tone, locale, (text) => {
               send({ type: 'delta', platform, text })

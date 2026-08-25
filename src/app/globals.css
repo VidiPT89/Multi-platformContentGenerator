@@ -264,7 +264,6 @@ select {
 
 .plate {
   position: relative;
-  min-height: 18rem;
 }
 
 .plate::before,
@@ -295,6 +294,14 @@ select {
   width: 100%;
   transform-origin: left center;
   background: linear-gradient(90deg, var(--ember), var(--amber));
+}
+
+.over {
+  color: #ff4d00;
+}
+
+.field.over {
+  border-color: #ff4d00;
 }
 
 .field:focus,

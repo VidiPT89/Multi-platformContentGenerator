@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { listPacks, patchPack, savePack } from '@/lib/store'
+import { deletePack, listPacks, patchPack, savePack } from '@/lib/store'
 import { PLATFORMS, type Locale, type Pack, type Platform, type Tone } from '@/lib/types'
 
 const TONES: Tone[] = ['formal', 'warm', 'punchy', 'playful']
@@ -38,6 +38,13 @@ export async function PATCH(request: NextRequest) {
   const pack = await patchPack(body.id, body.texts)
   if (!pack) return NextResponse.json({ error: 'missing' }, { status: 404 })
   return NextResponse.json({ pack })
+}
+
+export async function DELETE(request: NextRequest) {
+  const body = (await request.json()) as { id?: string }
+  if (!body.id) return NextResponse.json({ error: 'id' }, { status: 400 })
+  const packs = await deletePack(body.id)
+  return NextResponse.json({ packs })
 }
 
 function emptyTexts(): Record<Platform, string> {

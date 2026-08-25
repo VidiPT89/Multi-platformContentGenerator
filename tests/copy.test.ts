@@ -4,6 +4,8 @@ import { clip, localCopy } from '../src/lib/copy'
 import { filledKey } from '../src/lib/keys'
 import { parseTheme } from '../src/lib/theme'
 import { profileFor } from '../src/lib/buffer'
+import { filterPacks, hashtagCount, overLimit, pickPlatforms, remaining } from '../src/lib/press'
+import { formatWhen, parseWhen } from '../src/lib/when'
 import { LIMITS } from '../src/lib/types'
 
 test('twitter copy stays within 280 characters', () => {
@@ -15,7 +17,7 @@ test('twitter copy stays within 280 characters', () => {
 test('english blog has a markdown title', () => {
   const pack = localCopy('Shipping a small press', 'formal', 'en')
   assert.match(pack.blog, /^# Shipping/)
-  assert.match(pack.linkedin, /LinkedIn/)
+  assert.match(pack.linkedin, /Shipping a small press/)
 })
 
 test('clip trims long twitter text', () => {
@@ -51,4 +53,32 @@ test('buffer profile matching ignores blog', () => {
   ]
   assert.equal(profileFor(profiles, 'twitter')?.id, '1')
   assert.equal(profileFor(profiles, 'blog'), null)
+})
+
+test('press helpers pick platforms, remaining and history search', () => {
+  assert.deepEqual(pickPlatforms(['twitter']), ['twitter'])
+  assert.deepEqual(pickPlatforms(['nope']), ['twitter', 'linkedin', 'instagram', 'blog'])
+  assert.equal(remaining('twitter', 'hi'), 278)
+  assert.equal(overLimit('twitter', 'x'.repeat(281)), true)
+  assert.equal(hashtagCount('#cascais #iVidi noite'), 2)
+  const packs = [
+    {
+      id: '1',
+      topic: 'Café',
+      tone: 'warm' as const,
+      locale: 'pt' as const,
+      createdAt: '2026-08-25',
+      texts: { twitter: 'a', linkedin: 'b', instagram: '#sol', blog: 'c' },
+    },
+  ]
+  assert.equal(filterPacks(packs, 'café').length, 1)
+  assert.equal(filterPacks(packs, 'linkedin-only').length, 0)
+})
+
+test('relative time uses locale', () => {
+  const now = Date.parse('2026-08-25T08:11:00.000Z')
+  assert.equal(formatWhen('2026-08-25T08:10:00.000Z', 'pt', now), 'há 1 min')
+  assert.equal(formatWhen('2026-08-25T08:10:00.000Z', 'en', now), '1m ago')
+  assert.equal(parseWhen('nope'), null)
+  assert.ok(parseWhen('2026-08-26T14:00'))
 })

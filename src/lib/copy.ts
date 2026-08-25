@@ -61,48 +61,68 @@ export function systemPrompt(platform: Platform, tone: Tone, locale: Locale) {
         ? `Write a short blog article in Markdown: title as # heading, 3–5 sections, closing line. Max ${LIMITS.blog} characters.`
         : `Escreve um artigo curto de blog em Markdown: título em #, 3–5 secções, fecho. Máximo ${LIMITS.blog} caracteres.`,
   }
-  return `You write for ECO, a press that echoes one theme across four platforms. Use ${toneLine}. ${lang}\n${rules[platform]}\nReturn only the copy.`
+  return `You write copy about the user's theme. Use ${toneLine}. ${lang}\n${rules[platform]}\nReturn only the copy.`
+}
+
+function tags(seed: string, locale: Locale) {
+  const words = seed
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((word) => word.length > 2)
+    .slice(0, 5)
+  const extra = locale === 'en' ? ['buildinpublic', 'shipping'] : ['cascais', 'portugal']
+  return [...words, 'ividi', ...extra].map((word) => `#${word}`).join(' ')
 }
 
 function twitterPt(seed: string, tone: Tone) {
-  if (tone === 'punchy') return `${seed}: uma ideia, quatro vozes. Publica hoje.`
-  if (tone === 'playful') return `${seed}, mas em 280 caracteres e sem drama. Eco a eco.`
+  if (tone === 'punchy') return `${seed}. Agora, não para depois.`
+  if (tone === 'playful') return `${seed}… e se for hoje, ainda melhor.`
   if (tone === 'warm') return `Ando a pensar nisto: ${seed}. Se te disser alguma coisa, responde.`
-  return `${seed}. Um tema, quatro formatos. Começa pelo mais curto.`
+  return `${seed}. Um passo claro vale mais do que dez planos.`
 }
 
 function twitterEn(seed: string, tone: Tone) {
-  if (tone === 'punchy') return `${seed}: one idea, four voices. Publish today.`
-  if (tone === 'playful') return `${seed}, in 280 characters and without the fuss.`
+  if (tone === 'punchy') return `${seed}. Now, not someday.`
+  if (tone === 'playful') return `${seed}… and today would be a good day for it.`
   if (tone === 'warm') return `I keep coming back to this: ${seed}. If it lands, say so.`
-  return `${seed}. One theme, four formats. Start with the shortest.`
+  return `${seed}. One clear step beats ten plans.`
 }
 
 function linkedinPt(seed: string, tone: Tone) {
+  const close =
+    tone === 'punchy'
+      ? 'Menos teoria. Um passo esta semana.'
+      : tone === 'playful'
+        ? 'Se isto te fizer sorrir e depois agir, já valeu.'
+        : tone === 'warm'
+          ? 'Se te disser alguma coisa, deixa uma nota. Eu leio.'
+          : 'O próximo passo é escrever o que vais fazer até sexta.'
   return [
-    `Tema: ${seed}.`,
+    seed,
     '',
-    tone === 'formal'
-      ? 'A mesma mensagem não cabe igual em todas as redes. O que funciona no LinkedIn cansa no X, e o que serve de legenda no Instagram não é um artigo.'
-      : 'A mesma ideia muda de fato consoante a sala. No escritório fala-se de um modo; na rua, de outro.',
+    'A ideia só conta quando sai da cabeça e encontra um sítio: um post, uma conversa, um calendário.',
     '',
-    'O ECO parte de um tema e de um tom, e devolve quatro versões para editares à mão antes de publicares.',
-    '',
-    tone === 'punchy' ? 'Menos ruído. Mais eco.' : 'Se isto te for útil, guarda o pacote e agenda quando fizer sentido.',
+    close,
   ].join('\n')
 }
 
 function linkedinEn(seed: string, tone: Tone) {
+  const close =
+    tone === 'punchy'
+      ? 'Less theory. One step this week.'
+      : tone === 'playful'
+        ? 'If this makes you smile and then act, it already paid off.'
+        : tone === 'warm'
+          ? 'If it lands, leave a note. I read them.'
+          : 'The next step is to write what you will do by Friday.'
   return [
-    `Theme: ${seed}.`,
+    seed,
     '',
-    tone === 'formal'
-      ? 'The same message does not fit every network. What works on LinkedIn tires on X, and an Instagram caption is not an article.'
-      : 'The same idea changes clothes with the room. The office and the street do not share a voice.',
+    'An idea only counts when it leaves your head and finds a place: a post, a conversation, a calendar.',
     '',
-    'ECO starts from a theme and a tone, then returns four versions for you to edit before you publish.',
-    '',
-    tone === 'punchy' ? 'Less noise. More echo.' : 'If this helps, save the pack and schedule it when it is time.',
+    close,
   ].join('\n')
 }
 
@@ -110,9 +130,11 @@ function instagramPt(seed: string, tone: Tone) {
   return [
     tone === 'playful' ? `Psst: ${seed}.` : seed,
     '',
-    'Quatro placas. Uma tinta. Tu escolhes o tom e afinás o texto antes de sair.',
+    tone === 'formal'
+      ? 'Uma frase. Um sítio. Um próximo passo.'
+      : 'Guarda isto se te servir. Depois faz uma coisa pequena com a ideia.',
     '',
-    '#conteudo #redessociais #ividi #copywriting #linkedin #instagram #twitter #blog',
+    tags(seed, 'pt'),
   ].join('\n')
 }
 
@@ -120,9 +142,11 @@ function instagramEn(seed: string, tone: Tone) {
   return [
     tone === 'playful' ? `Psst: ${seed}.` : seed,
     '',
-    'Four plates. One ink. You pick the tone and tune the line before it leaves.',
+    tone === 'formal'
+      ? 'One line. One place. One next step.'
+      : 'Save this if it helps. Then do one small thing with the idea.',
     '',
-    '#content #socialmedia #ividi #copywriting #linkedin #instagram #twitter #blog',
+    tags(seed, 'en'),
   ].join('\n')
 }
 
@@ -130,21 +154,19 @@ function blogPt(seed: string, tone: Tone) {
   return [
     `# ${seed}`,
     '',
-    'Um tema não é um post. É a semente. O post é o que acontece quando essa semente encontra o sítio certo.',
+    `Queres avançar com isto: ${seed}. Não falta mais um quadro branco. Falta um corte.`,
     '',
-    '## Quatro salas',
+    '## O que isto pede',
     '',
-    'X pede um corte. O LinkedIn pede um argumento. O Instagram pede um gancho e ar. O blog pede tempo.',
+    'Diz a ideia em duas frases. Escolhe quem precisa de a ouvir. Marca uma hora esta semana.',
     '',
     '## O tom',
     '',
-    `Aqui o tom é ${TONE_PT[tone]}. Muda o tom e o mesmo tema veste outra voz, sem reescreveres tudo do zero.`,
+    `Aqui o tom é ${TONE_PT[tone]}. Ajusta as frases até soarem a ti.`,
     '',
-    '## Como usar',
+    '## Fecho',
     '',
-    'Gera as quatro versões, edita na placa, guarda no histórico e agenda (fila local ou Buffer, se tiveres token).',
-    '',
-    'Publica quando a frase já for tua.',
+    'Publica quando a frase já for tua, não quando estiver perfeita.',
   ].join('\n')
 }
 
@@ -152,20 +174,18 @@ function blogEn(seed: string, tone: Tone) {
   return [
     `# ${seed}`,
     '',
-    'A theme is not a post. It is the seed. The post is what happens when that seed meets the right room.',
+    `You want to move this forward: ${seed}. You do not need another whiteboard. You need a cut.`,
     '',
-    '## Four rooms',
+    '## What it asks',
     '',
-    'X wants a cut. LinkedIn wants an argument. Instagram wants a hook and air. The blog wants time.',
+    'Say the idea in two sentences. Pick who needs to hear it. Put an hour on this week.',
     '',
     '## Tone',
     '',
-    `Here the tone is ${TONE_EN[tone]}. Change the tone and the same theme wears another voice, without starting from a blank page.`,
+    `Here the tone is ${TONE_EN[tone]}. Tune the lines until they sound like you.`,
     '',
-    '## How to use it',
+    '## Close',
     '',
-    'Generate the four versions, edit on the plate, save to history and schedule (local queue or Buffer, if you have a token).',
-    '',
-    'Publish when the line already sounds like you.',
+    'Publish when the line already sounds like you, not when it is perfect.',
   ].join('\n')
 }

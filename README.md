@@ -13,8 +13,9 @@ Without a model key, the press still prints local plates. Without a Buffer token
 - 🎯 **Theme + tone** — formal, warm, punchy or playful
 - 📰 **Four outputs in parallel** — X, LinkedIn, Instagram, blog
 - ✏️ **Inline edit** — tune each plate before you publish
-- 🗂️ **History** — reopen a saved pack
-- 📅 **Scheduling** — Buffer API when a token is set, otherwise a local queue
+- ♻️ **Regenerate one plate** — keep the other three
+- 🗂️ **History** — search, reopen or remove a pack
+- 📅 **Scheduling** — Buffer API when a token is set, otherwise a local queue you can see and clear
 - 🌍 **PT / EN toggle** — remembered in `localStorage`
 - 🌓 **Dark / light** — same burnt orange and amber, cream paper in light mode
 - 🎬 **Motion** — ember glow, stacked plates and ink bars while printing
@@ -76,16 +77,17 @@ To schedule through Buffer, set `BUFFER_ACCESS_TOKEN`. Blog copy always stays on
 
 1. Toggle **PT** or **EN**, and **Dark** or **Light**, in the header.
 2. Open the press. Write a theme and pick a tone.
-3. Generate the four voices. Edit any plate inline.
-4. Copy, save to history, or pick a time and schedule.
+3. Generate the four voices (or **Ctrl/Cmd + Enter**). Edit any plate inline, or regenerate just one.
+4. Copy one plate or all four, save to history, search older packs, or pick a time and schedule (one or all).
 
 ## 🔌 API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
+| GET | `/api/generate` | Whether a hosted model key is set |
 | POST | `/api/generate` | Stream four platform drafts |
-| GET / POST / PATCH | `/api/history` | List, save or edit packs |
-| GET / POST | `/api/schedule` | Local queue or Buffer create |
+| GET / POST / PATCH / DELETE | `/api/history` | List, save, edit or remove packs |
+| GET / POST / DELETE | `/api/schedule` | Local queue or Buffer create |
 
 ## 🧪 Testing
 

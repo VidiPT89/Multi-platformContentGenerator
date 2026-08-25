@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { hasBuffer, scheduleOnBuffer } from '@/lib/buffer'
-import { listQueue, saveQueueItem } from '@/lib/store'
+import { deleteQueueItem, listQueue, saveQueueItem } from '@/lib/store'
 import { PLATFORMS, type Platform } from '@/lib/types'
 
 export async function GET() {
@@ -32,4 +32,11 @@ export async function POST(request: NextRequest) {
     remoteId: remote.ok ? remote.remoteId : undefined,
   })
   return NextResponse.json({ item, buffer: hasBuffer(), remote })
+}
+
+export async function DELETE(request: NextRequest) {
+  const body = (await request.json()) as { id?: string }
+  if (!body.id) return NextResponse.json({ error: 'id' }, { status: 400 })
+  const items = await deleteQueueItem(body.id)
+  return NextResponse.json({ items, buffer: hasBuffer() })
 }
