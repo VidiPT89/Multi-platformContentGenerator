@@ -27,10 +27,6 @@ export function chatModel() {
   return null
 }
 
-export function localPack(topic: string, tone: Tone, locale: Locale) {
-  return localCopy(topic, tone, locale)
-}
-
 export async function streamPlatform(
   platform: Platform,
   topic: string,

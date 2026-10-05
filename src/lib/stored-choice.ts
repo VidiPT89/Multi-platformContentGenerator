@@ -37,14 +37,3 @@ export function useStoredChoice<T extends string>(
   )
   return [value, set]
 }
-
-const noSubscription = () => () => {}
-
-/** A query-string flag, read during render (null on the server). */
-export function useQueryFlag(name: string): string | null {
-  return useSyncExternalStore(
-    noSubscription,
-    () => new URLSearchParams(window.location.search).get(name),
-    () => null,
-  )
-}
