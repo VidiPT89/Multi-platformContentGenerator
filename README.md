@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/VidiPT89/Multi-platformContentGenerator/actions/workflows/ci.yml/badge.svg)](https://github.com/VidiPT89/Multi-platformContentGenerator/actions/workflows/ci.yml)
 
-**🌐 Live demo:** [multi-platform-content-generator-six.vercel.app](https://multi-platform-content-generator-six.vercel.app) · Runs with the local writer, no model key needed. The history lives in the server's temp folder, so it is not kept between visits.
+**🌐 Live demo:** [eco.ividi.dev](https://eco.ividi.dev) · Runs with the local writer, no model key needed. The history lives in the server's temp folder, so it is not kept between visits.
 
 [🐞 Report Bug](https://github.com/VidiPT89/Multi-platformContentGenerator/issues) · [✨ Request Feature](https://github.com/VidiPT89/Multi-platformContentGenerator/issues)
 
