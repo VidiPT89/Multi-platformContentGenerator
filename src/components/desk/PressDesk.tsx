@@ -4,6 +4,7 @@ import { PlateCard } from '@/components/desk/PlateCard'
 import { SideRail } from '@/components/desk/SideRail'
 import { useLocale } from '@/i18n/LocaleProvider'
 import { PLATFORMS, type Pack, type Platform, type QueueItem, type Tone } from '@/lib/types'
+import { useStoredChoice } from '@/lib/stored-choice'
 import { parseWhen } from '@/lib/when'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
@@ -17,10 +18,23 @@ function defaultWhen() {
   return `${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}T${pad(next.getHours())}:${pad(next.getMinutes())}`
 }
 
+const TONES: readonly Tone[] = ['formal', 'warm', 'punchy', 'playful']
+
+type DeskData = { packs?: Pack[]; queue?: { items: QueueItem[]; buffer: boolean }; live?: boolean }
+
+async function fetchDesk(): Promise<DeskData> {
+  const [hist, sched, gen] = await Promise.all([fetch('/api/history'), fetch('/api/schedule'), fetch('/api/generate')])
+  const desk: DeskData = {}
+  if (hist.ok) desk.packs = ((await hist.json()) as { packs: Pack[] }).packs
+  if (sched.ok) desk.queue = (await sched.json()) as { items: QueueItem[]; buffer: boolean }
+  if (gen.ok) desk.live = Boolean(((await gen.json()) as { live: boolean }).live)
+  return desk
+}
+
 export function PressDesk() {
   const { t, locale } = useLocale()
   const [topic, setTopic] = useState('')
-  const [tone, setTone] = useState<Tone>('warm')
+  const [tone, setTone] = useStoredChoice<Tone>(TONE_KEY, TONES, 'warm')
   const [texts, setTexts] = useState(empty)
   const [busy, setBusy] = useState(false)
   const [live, setLive] = useState(false)
@@ -43,35 +57,32 @@ export function PressDesk() {
     ? 'Launching iVidi.dev: sites and apps for people and small businesses, from Cascais.'
     : 'Abrir a iVidi.dev: sites e apps para particulares e pequenas empresas, a partir de Cascais.'
 
+  const applyHistory = useCallback((desk: DeskData) => {
+    if (desk.packs) setPacks(desk.packs)
+    if (desk.queue) {
+      setQueue(desk.queue.items)
+      setBuffer(desk.queue.buffer)
+    }
+    if (desk.live !== undefined) setLive(desk.live)
+  }, [])
+
   const loadHistory = useCallback(async () => {
-    const [hist, sched, gen] = await Promise.all([fetch('/api/history'), fetch('/api/schedule'), fetch('/api/generate')])
-    if (hist.ok) {
-      const data = (await hist.json()) as { packs: Pack[] }
-      setPacks(data.packs)
-    }
-    if (sched.ok) {
-      const data = (await sched.json()) as { items: QueueItem[]; buffer: boolean }
-      setQueue(data.items)
-      setBuffer(data.buffer)
-    }
-    if (gen.ok) {
-      const data = (await gen.json()) as { live: boolean }
-      setLive(Boolean(data.live))
-    }
-  }, [])
+    applyHistory(await fetchDesk())
+  }, [applyHistory])
 
   useEffect(() => {
-    void loadHistory()
-  }, [loadHistory])
-
-  useEffect(() => {
-    const stored = localStorage.getItem(TONE_KEY)
-    if (stored === 'formal' || stored === 'warm' || stored === 'punchy' || stored === 'playful') setTone(stored)
-  }, [])
-
-  useEffect(() => {
-    localStorage.setItem(TONE_KEY, tone)
-  }, [tone])
+    let ignore = false
+    fetchDesk()
+      .then((desk) => {
+        if (!ignore) applyHistory(desk)
+      })
+      .catch(() => {
+        /* offline: start with an empty history */
+      })
+    return () => {
+      ignore = true
+    }
+  }, [applyHistory])
 
   useEffect(() => {
     if (!dirty || busy || topic.trim().length < 3) return
