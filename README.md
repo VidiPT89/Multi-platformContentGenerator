@@ -2,6 +2,8 @@
 
 > One theme echoed across Twitter, LinkedIn, Instagram and a blog, painted in the ividi.dev palette (black, burnt orange, amber).
 
+[![CI](https://github.com/VidiPT89/Multi-platformContentGenerator/actions/workflows/ci.yml/badge.svg)](https://github.com/VidiPT89/Multi-platformContentGenerator/actions/workflows/ci.yml)
+
 [🐞 Report Bug](https://github.com/VidiPT89/Multi-platformContentGenerator/issues) · [✨ Request Feature](https://github.com/VidiPT89/Multi-platformContentGenerator/issues)
 
 ECO is a Next.js press for social copy. You give a theme and a tone; four plates fill in parallel: an X/Twitter post, a LinkedIn piece, an Instagram caption and a Markdown blog article. Edit on the plate, save a history and schedule through Buffer or a local queue. The UI is European Portuguese / English, with language and dark / light theme toggles remembered in `localStorage`. Light mode keeps the same ividi.dev palette on cream paper.
