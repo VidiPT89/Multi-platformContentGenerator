@@ -1,8 +1,11 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { PLATFORMS, type Pack, type Platform, type QueueItem } from './types'
 
-const dir = path.join(process.cwd(), 'data')
+// On Vercel the project folder is read-only, so the hosted demo keeps its history in the
+// instance's temp folder (it resets when the instance is recycled). Locally it stays in data/.
+const dir = process.env.VERCEL ? path.join(tmpdir(), 'eco-data') : path.join(process.cwd(), 'data')
 const historyFile = path.join(dir, 'history.json')
 const queueFile = path.join(dir, 'queue.json')
 
